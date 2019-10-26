@@ -1,11 +1,13 @@
+#include "main.hpp"
+
+#include "canvas.hpp"
+#include "worker.hpp"
+
 #include <algorithm>
 #include <fstream>
 #include <iostream>
 #include <vector>
 #include <random>
-
-#include "canvas.hpp"
-#include "worker.hpp"
 
 using std::default_random_engine;
 using std::uniform_real_distribution;
@@ -19,8 +21,7 @@ void loop() { update(); }
 
 struct Particle
 {
-    float x;
-    float y;
+    vec2 position;
 };
 
 const uint32_t screen_width = 1280 / 2;
@@ -36,9 +37,8 @@ int main()
 
     for (uint32_t i = 0; i < particle_count; i++)
     {
-        float x = rnd() * screen_width;
-        float y = rnd() * screen_height;
-        particles->push_back({.x = x, .y = y});
+        vec2 pos = vec2(rnd() * screen_width, rnd() * screen_height);
+        particles->push_back({.position = pos});
     }
 
     int threads = std::min((int)thread::hardware_concurrency(), 8);
@@ -59,8 +59,7 @@ int main()
     update = [&]() {
         for (auto& p : *particles)
         {
-            p.x = rnd() * screen_width;
-            p.y = rnd() * screen_height;
+            p.position = vec2(rnd() * screen_width, rnd() * screen_height);
         }
 
         workers.Run();

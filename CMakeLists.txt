@@ -28,7 +28,8 @@ SOURCE_GROUP("Source" FILES ${SOURCES})
 SOURCE_GROUP("Source" FILES ${HEADERS})
 
 include_directories(
-    ${PROJECT_SOURCE_DIR})
+    ${PROJECT_SOURCE_DIR}
+    ${PROJECT_SOURCE_DIR}/lib/glm)
 
 add_executable(
     ${PROJECT_NAME}
