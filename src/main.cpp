@@ -3,21 +3,9 @@
 #include "canvas.hpp"
 #include "worker.hpp"
 
-#include <algorithm>
 #include <fstream>
 #include <iostream>
 #include <vector>
-#include <random>
-
-using std::default_random_engine;
-using std::uniform_real_distribution;
-
-default_random_engine generator;
-uniform_real_distribution<double> distribution(0.0, 1.0);
-inline float rnd() { return static_cast<float>(distribution(generator)); }
-
-function<void()> update;
-void loop() { update(); }
 
 struct Particle
 {
