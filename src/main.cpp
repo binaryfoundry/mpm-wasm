@@ -25,20 +25,36 @@ struct Cell
 
 const uint32_t screen_width = 1280 / 2;
 const uint32_t screen_height = 720 / 2;
-const uint32_t particle_count = 4096;
+const uint32_t num_particles = 4096;
 const size_t particle_size_bytes = sizeof(Particle);
 
+const uint32_t grid_res = 64;
+const uint32_t num_cells = grid_res * grid_res;
+
+// simulation parameters
+
+const float dt = 1.0f;
+const uint32_t iterations = static_cast<uint32_t>(1.0f / dt);
+
+const vec2 gravity = vec2(0.0f, -0.05f);
+vec2 weights[3];
+
 vector<Particle>* particles;
+vector<Cell>* cells;
+
 WorkerGroup workers;
 
 int main()
 {
     particles = new vector<Particle>();
+    cells = new vector<Cell>();
 
-    for (uint32_t i = 0; i < particle_count; i++)
+    for (uint32_t i = 0; i < num_particles; i++)
     {
         vec2 pos = vec2(rnd() * screen_width, rnd() * screen_height);
-        particles->push_back({.x = pos});
+        particles->push_back({
+            .x = pos
+        });
     }
 
     int threads = std::min((int)thread::hardware_concurrency(), 8);
@@ -71,4 +87,5 @@ int main()
     workers.Terminate();
 
     delete particles;
+    delete cells;
 }
