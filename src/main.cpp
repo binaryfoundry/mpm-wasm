@@ -23,13 +23,13 @@ struct Cell
     float padding;
 };
 
-const uint32_t screen_width = 1280 / 2;
-const uint32_t screen_height = 720 / 2;
-const uint32_t num_particles = 4096;
+const uint32_t screen_width = 640;
+const uint32_t screen_height = 640;
 const size_t particle_size_bytes = sizeof(Particle);
-
 const uint32_t grid_res = 64;
 const uint32_t num_cells = grid_res * grid_res;
+
+uint32_t num_particles = 0;
 
 // simulation parameters
 
@@ -39,23 +39,41 @@ const uint32_t iterations = static_cast<uint32_t>(1.0f / dt);
 const vec2 gravity = vec2(0.0f, -0.05f);
 vec2 weights[3];
 
-vector<Particle>* particles;
-vector<Cell>* cells;
+vector<Particle>* ps;
+vector<Cell>* grid;
 
 WorkerGroup workers;
 
 int main()
 {
-    particles = new vector<Particle>();
-    cells = new vector<Cell>();
+    ps = new vector<Particle>();
+    grid = new vector<Cell>();
 
-    for (uint32_t i = 0; i < num_particles; i++)
+    vector<vec2> temp_positions;
+    const float spacing = 1.0f;
+    const int box_x = 16, box_y = 16;
+    const float sx = grid_res / 2.0f, sy = grid_res / 2.0f;
+    for (float i = sx - box_x / 2; i < sx + box_x / 2; i += spacing)
     {
-        vec2 pos = vec2(rnd() * screen_width, rnd() * screen_height);
-        particles->push_back({
-            .x = pos
+        for (float j = sy - box_y / 2; j < sy + box_y / 2; j += spacing)
+        {
+            vec2 pos = vec2(i, j);
+            temp_positions.push_back(pos);
+        }
+    }
+
+    num_particles = temp_positions.size();
+
+    for (int i = 0; i < num_particles; ++i)
+    {
+        ps->push_back({
+            .x = temp_positions[i],
+            .v = vec2(rnd() - 0.5f, rnd() - 0.5f + 2.75f) * 0.5f,
+            .mass = 1
         });
     }
+
+    grid->resize(num_cells);
 
     int threads = std::min((int)thread::hardware_concurrency(), 8);
     cout << "hardware_concurrency: " << threads << std::endl;
@@ -73,19 +91,19 @@ int main()
     canvas_setup(screen_width, screen_height);
 
     update = [&]() {
-        for (auto& p : *particles)
+        for (auto& p : *ps)
         {
-            p.x = vec2(rnd() * screen_width, rnd() * screen_height);
+            //p.x = vec2(rnd() * screen_width, rnd() * screen_height);
         }
 
         workers.Run();
-        canvas_draw((float*)(&(*particles)[0]), particles->size(), particle_size_bytes);
+        canvas_draw((float*)(&(*ps)[0]), ps->size(), particle_size_bytes);
     };
 
     emscripten_set_main_loop(loop, 0, 1);
 
     workers.Terminate();
 
-    delete particles;
-    delete cells;
+    delete ps;
+    delete grid;
 }
