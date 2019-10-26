@@ -14,9 +14,18 @@ EM_JS(void, canvas_setup, (int nx, int ny), {
     window.imageCanvas = imageCanvas;
 });
 
-EM_JS(void, canvas_draw, (), {
+EM_JS(void, canvas_draw, (float* particles, uint32_t size), {
     var ctx = window.ctx;
     var canvas = window.imageCanvas;
-    ctx.fillStyle = 'green';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.beginPath();
+    ctx.fillStyle = 'black';
+    for (var i = 0; i < size; i++)
+    {
+        var offset = 8 * i;
+        var x = HEAPF32[(particles + offset + 0) >> 2];
+        var y = HEAPF32[(particles + offset + 4) >> 2];
+        ctx.rect(x, y, 1, 1);
+    }
+    ctx.fill();
 });
