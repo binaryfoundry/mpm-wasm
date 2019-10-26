@@ -21,13 +21,13 @@ EM_JS(void, canvas_draw, (float* particles, uint32_t size, size_t particle_size_
     ctx.fillStyle = '#AED6F1';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = 'black';
-    var s = (1/64) * 720;
+    var s = (1/64) * 640;
     for (var i = 0; i < size; i++)
     {
         var offset = particle_size_bytes * i;
         var x = HEAPF32[(particles + offset + 0) >> 2];
         var y = HEAPF32[(particles + offset + 4) >> 2];
-        ctx.rect((x * s) - 1, (y * s) - 1, 3, 3);
+        ctx.rect((x * s) - 1, 640 - ((y * s) - 1), 3, 3);
     }
     ctx.fill();
 });
