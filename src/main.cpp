@@ -238,6 +238,9 @@ void P2G()
     }
 }
 
+const int wall_min = 3;
+const int wall_max = (grid_res - 1) - wall_min;
+
 void update_grid()
 {
     for (auto& cell : grid)
@@ -316,6 +319,13 @@ void G2P()
         //        p.v += force;
         //    }
         //}
+
+        // NEW: predictive boundary conditions that soften velocities near the domain's edges
+        vec2 x_n = p.x + p.v;
+        if (x_n.x < wall_min) p.v.x += wall_min - x_n.x;
+        if (x_n.x > wall_max) p.v.x += wall_max - x_n.x;
+        if (x_n.y < wall_min) p.v.y += wall_min - x_n.y;
+        if (x_n.y > wall_max) p.v.y += wall_max - x_n.y;
 
         // deformation gradient update - MPM course, equation 181
         // Fp' = (I + dt * p.C) * Fp
