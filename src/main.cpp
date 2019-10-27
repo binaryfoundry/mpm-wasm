@@ -12,8 +12,9 @@ struct Particle
     vec2 x;
     vec2 v;
     mat2 C;
+    mat2 F;
     float mass;
-    float padding;
+    float volume_0;
 };
 
 struct Cell
@@ -29,37 +30,46 @@ const size_t particle_size_bytes = sizeof(Particle);
 const uint32_t grid_res = 64;
 const uint32_t num_cells = grid_res * grid_res;
 
-uint32_t num_particles = 0;
-
 // simulation parameters
-
-const float dt = 1.0f;
+const float dt = 0.1f;
 const uint32_t iterations = static_cast<uint32_t>(1.0f / dt);
+const vec2 gravity = vec2(0.0f, -0.3f);
 
-const vec2 gravity = vec2(0.0f, -0.05f);
+// Lamé parameters for stress-strain relationship
+const float elastic_lambda = 10.0f;
+const float elastic_mu = 20.0f;
+
+uint32_t num_particles = 0;
 
 vector<Particle> ps;
 vector<Cell> grid;
 
 WorkerGroup workers;
 
-void simulate();
+void clear_grid();
+void P2G();
+void update_grid();
+void G2P();
 
-int main()
+vector<vec2> spawn_box(int x, int y, int box_x = 16, int box_y = 16)
 {
     vector<vec2> temp_positions;
-    const float spacing = 1.0f;
-    const int box_x = 16, box_y = 16;
-    const float sx = grid_res / 2.0f, sy = grid_res / 2.0f;
-    for (float i = sx - box_x / 2; i < sx + box_x / 2; i += spacing)
+    const float spacing = 0.5f;
+    for (float i = - box_x / 2; i < box_x / 2; i += spacing)
     {
-        for (float j = sy - box_y / 2; j < sy + box_y / 2; j += spacing)
+        for (float j = - box_y / 2; j < box_y / 2; j += spacing)
         {
-            vec2 pos = vec2(i, j);
+            vec2 pos = vec2(x + i, y + j);
             temp_positions.push_back(pos);
         }
     }
 
+    return temp_positions;
+}
+
+int main()
+{
+    vector<vec2> temp_positions = spawn_box(grid_res / 2, grid_res / 2, 16, 16);
     num_particles = temp_positions.size();
 
     for (int i = 0; i < num_particles; ++i)
@@ -67,7 +77,9 @@ int main()
         ps.push_back({
             .x = temp_positions[i],
             .v = vec2(rnd() - 0.5f, rnd() - 0.5f + 2.75f) * 0.5f,
-            .mass = 1
+            .C = mat2(0.0f),
+            .F = mat2(),
+            .mass = 1,
         });
     }
 
@@ -76,6 +88,38 @@ int main()
     for (uint32_t i = 0; i < num_cells; i++)
     {
         grid[i].index = i;
+    }
+
+    P2G();
+
+    for (auto& p : ps)
+    {
+        // quadratic interpolation weights
+        uvec2 cell_idx = uvec2(p.x);
+        vec2 cell_diff = (p.x - vec2(cell_idx)) - vec2(0.5f);
+
+        vec2 weights[3];
+        weights[0] = vec2(0.5f) * glm::pow(vec2(0.5f) - cell_diff, vec2(2.0f));
+        weights[1] = vec2(0.75f) - glm::pow(cell_diff, vec2(2.0f));
+        weights[2] = vec2(0.5f) * glm::pow(vec2(0.5f) + cell_diff, vec2(2.0f));
+
+        float density = 0.0f;
+        // iterate over neighbouring 3x3 cells
+        for (int gx = 0; gx < 3; ++gx)
+        {
+            for (int gy = 0; gy < 3; ++gy)
+            {
+                float weight = weights[gx].x * weights[gy].y;
+
+                // map 2D to 1D index in grid
+                int cell_index = ((int)cell_idx.x + (gx - 1)) * grid_res + ((int)cell_idx.y + gy - 1);
+                density += grid[cell_index].mass * weight;
+            }
+        }
+
+        // per-particle volume estimate has now been computed
+        float volume = p.mass / density;
+        p.volume_0 = volume;
     }
 
     int threads = std::min((int)thread::hardware_concurrency(), 8);
@@ -96,7 +140,10 @@ int main()
     update = [&]() {
         for (uint32_t i = 0; i < iterations; ++i)
         {
-            simulate();
+            clear_grid();
+            P2G();
+            update_grid();
+            G2P();
         }
 
         //workers.Run();
@@ -108,17 +155,46 @@ int main()
     workers.Terminate();
 }
 
-void simulate()
+void clear_grid()
 {
     for (auto& cell : grid)
     {
         cell.mass = 0;
         cell.v = vec2(0);
     }
+}
 
-    // P2G
+void P2G()
+{
     for (auto& p : ps)
     {
+        mat2 F = p.F;
+
+        float J = glm::determinant(F);
+
+        // MPM course, page 46
+        float volume = p.volume_0 * J;
+
+        // useful matrices for Neo-Hookean model
+        mat2 F_T = glm::transpose(F);
+        mat2 F_inv_T = glm::inverse(F_T); // precompute?
+        mat2 F_minus_F_inv_T = F - F_inv_T;
+
+        // MPM course equation 48
+        mat2 P_term_0 = elastic_mu * (F_minus_F_inv_T);
+        mat2 P_term_1 = elastic_lambda * log(J) * F_inv_T;
+        mat2 P = P_term_0 + P_term_1;
+
+        // cauchy_stress = (1 / det(F)) * P * F_T
+        // equation 38, MPM course
+        mat2 stress = (1.0f / J) * (P * F_T);
+
+        // (M_p)^-1 = 4, see APIC paper and MPM course page 42
+        // this term is used in MLS-MPM paper eq. 16. with quadratic weights, Mp = (1/4) * (delta_x)^2.
+        // in this simulation, delta_x = 1, because i scale the rendering of the domain rather than the domain itself.
+        // we multiply by dt as part of the process of fusing the momentum and force update for MLS-MPM
+        mat2 eq_16_term_0 = -volume * 4 * stress * dt;
+
         // quadratic interpolation weights
         uvec2 cell_idx = uvec2(p.x);
         vec2 cell_diff = (p.x - vec2(cell_idx)) - vec2(0.5f);
@@ -139,24 +215,31 @@ void simulate()
                 vec2 cell_dist = (vec2(cell_x) - p.x) + vec2(0.5f);
                 vec2 Q = p.C * cell_dist;
 
-                // MPM course, equation 172
-                float mass_contrib = weight * p.mass;
-
                 // converting 2D index to 1D
                 int cell_index = (int)cell_x.x * grid_res + (int)cell_x.y;
                 Cell& cell = grid[cell_index];
 
-                // scatter mass to the grid
-                cell.mass += mass_contrib;
-                cell.v += mass_contrib * (p.v + Q);
+                // MPM course, equation 172
+                float weighted_mass = weight * p.mass;
+                cell.mass += weighted_mass;
+
+                // APIC P2G momentum contribution
+                cell.v += weighted_mass * (p.v + Q);
+
+                // fused force/momentum update from MLS-MPM
+                // see MLS-MPM paper, equation listed after eqn. 28
+                vec2 momentum = (eq_16_term_0 * weight) * cell_dist;
+                cell.v += momentum;
 
                 // note: currently "cell.v" refers to MOMENTUM, not velocity!
                 // this gets corrected in the UpdateGrid step below.
             }
         }
     }
+}
 
-    // grid velocity update
+void update_grid()
+{
     for (auto& cell : grid)
     {
         if (cell.mass > 0)
@@ -172,8 +255,10 @@ void simulate()
             if (y < 2 || y > grid_res - 3) cell.v.y = 0;
         }
     }
+}
 
-    // G2P
+void G2P()
+{
     for (auto& p : ps)
     {
         // reset particle velocity. we calculate it from scratch each step using the grid
@@ -231,5 +316,11 @@ void simulate()
         //        p.v += force;
         //    }
         //}
+
+        // deformation gradient update - MPM course, equation 181
+        // Fp' = (I + dt * p.C) * Fp
+        mat2 Fp_new = mat2();
+        Fp_new += dt * p.C;
+        p.F = Fp_new * p.F;
     }
 }
