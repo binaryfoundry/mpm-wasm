@@ -36,8 +36,8 @@ const uint32_t iterations = static_cast<uint32_t>(1.0f / dt);
 const vec2 gravity = vec2(0.0f, -0.3f);
 
 // Lamé parameters for stress-strain relationship
-const float elastic_lambda = 10.0f;
-const float elastic_mu = 20.0f;
+const float elastic_lambda = 100.0f;
+const float elastic_mu = 0.1f;
 
 uint32_t num_particles = 0;
 
@@ -69,7 +69,7 @@ vector<vec2> spawn_box(int x, int y, int box_x = 16, int box_y = 16)
 
 int main()
 {
-    vector<vec2> temp_positions = spawn_box(grid_res / 2, grid_res / 2, 16, 16);
+    vector<vec2> temp_positions = spawn_box(grid_res / 2, grid_res / 2, 32, 32);
     num_particles = temp_positions.size();
 
     for (int i = 0; i < num_particles; ++i)
