@@ -1,11 +1,20 @@
+# MPM-WASM
+
+Material Point Method demo ported from Incremental MPM
+
+https://nialltl.neocities.org/articles/mpm_guide.html
+https://github.com/nialltl/incremental_mpm
+
 # Building
 
-## Windows Build
-* "make-win.bat" generates Visual Studio project in bin directory.
+## Build
+```
+./make-web.bat
+```
 
-## OSX Build
+## OSX
 
-Upstream backend currently has issues so use fastcomp.
+EMCC upstream backend currently has issues so use fastcomp.
 
 ```
 ./emsdk install 1.38.45-fastcomp
