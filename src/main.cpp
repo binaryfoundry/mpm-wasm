@@ -97,18 +97,18 @@ int main()
         grid[i].index = i;
     }
 
-    int threads = std::min((int)thread::hardware_concurrency(), 8);
-    cout << "hardware_concurrency: " << threads << std::endl;
+    //int threads = std::min((int)thread::hardware_concurrency(), 8);
+    //cout << "hardware_concurrency: " << threads << std::endl;
 
-    function<void(uint8_t n)> batch_update = [=](uint8_t n) {
-    };
+    //function<void(uint8_t n)> batch_update = [=](uint8_t n) {
+    //};
 
-    for (int n = 0; n < threads; ++n)
-    {
-        workers.AddWorker([=] {
-            batch_update(n);
-        });
-    }
+    //for (int n = 0; n < threads; ++n)
+    //{
+    //    workers.AddWorker([=] {
+    //        batch_update(n);
+    //    });
+    //}
 
     canvas_setup(screen_width, screen_height);
 
