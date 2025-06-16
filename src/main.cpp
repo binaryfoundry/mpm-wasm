@@ -48,10 +48,10 @@ const float damping = 0.999f;
 
 uint32_t num_particles = 0;
 
-vector<Particle> ps;
-vector<Cell> grid;
+std::vector<Particle> ps;
+std::vector<Cell> grid;
 
-WorkerGroup workers;
+WorkerPool workers;
 
 void clear_grid();
 void P2G_1();
@@ -59,9 +59,9 @@ void P2G_2();
 void update_grid();
 void G2P();
 
-vector<vec2> spawn_box(int x, int y, int box_x = 16, int box_y = 16)
+std::vector<vec2> spawn_box(int x, int y, int box_x = 16, int box_y = 16)
 {
-    vector<vec2> temp_positions;
+    std::vector<vec2> temp_positions;
     const float spacing = 0.5f;
     for (float i = - box_x / 2; i < box_x / 2; i += spacing)
     {
@@ -77,7 +77,7 @@ vector<vec2> spawn_box(int x, int y, int box_x = 16, int box_y = 16)
 
 int main()
 {
-    vector<vec2> temp_positions = spawn_box(grid_res / 2, grid_res / 2, 32, 32);
+    std::vector<vec2> temp_positions = spawn_box(grid_res / 2, grid_res / 2, 32, 32);
     num_particles = temp_positions.size();
 
     for (int i = 0; i < num_particles; ++i)

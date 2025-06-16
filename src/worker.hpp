@@ -1,154 +1,59 @@
 #pragma once
 
-#include <iostream>
-#include <algorithm>
 #include <memory>
-#include <queue>
-#include <vector>
-#include <functional>
 
+#include <vector>
+#include <atomic>
 #include <thread>
+#include <functional>
 #include <mutex>
 #include <condition_variable>
 
-using std::cout;
-using std::function;
-using std::queue;
-using std::vector;
-
-using std::thread;
-using std::mutex;
-using std::condition_variable;
-using std::unique_lock;
-using std::function;
-
-using std::shared_ptr;
-using std::make_shared;
-
-class Worker
+class Worker final
 {
 private:
-    volatile bool running = true;
-    volatile bool executing = false;
+    std::atomic<bool> active;
+    std::atomic<bool> working;
 
-    thread* thread_;
-    mutex mutex_;
-    condition_variable condition_;
-    condition_variable condition_join_;
-    function<void()> job;
+    std::unique_ptr<std::thread> thread;
+    std::mutex mutex;
+    std::condition_variable condition;
+    std::condition_variable condition_join;
+    std::function<void()> job;
+
+    void Loop();
 
 public:
-    Worker(function<void()> job) :
-        job(job)
-    {
-        thread_ = new thread([=] {
-            thread_loop();
-        });
-    }
+    Worker(std::function<void()>&& job);
+    Worker(const Worker&) = delete;
 
-    ~Worker()
-    {
-        Terminate();
-    }
+    virtual ~Worker();
 
-    void Terminate()
-    {
-        if (running)
-        {
-            running = false;
-            condition_.notify_one();
-            thread_->join();
-            delete thread_;
-        }
-    }
+    void Terminate();
+    void Notify();
 
-    void Notify()
-    {
-        executing = true;
-        condition_.notify_one();
-    }
-
-    void Join()
-    {
-        if (executing)
-        {
-            unique_lock<mutex> lock(mutex_);
-            condition_join_.wait(lock, [this] {
-                return !executing || !running;
-            });
-            executing = false;
-        }
-    }
-
-private:
-    void thread_loop()
-    {
-        do
-        {
-            unique_lock<mutex> lock(mutex_);
-            condition_.wait(lock, [this] {
-                return executing || !running;
-            });
-
-            if (running && executing)
-            {
-                job();
-            }
-
-            condition_join_.notify_one();
-            executing = false; //
-        }
-        while (running);
-    }
+    void Join();
 };
 
-class WorkerGroup
+class WorkerPool final
 {
 private:
-    vector<shared_ptr<Worker>> workers_;
+    size_t max_workers_;
+    std::vector<std::unique_ptr<Worker>> workers_;
+
+    void Notify();
+    void Join();
 
 public:
-    WorkerGroup()
-    {
-    }
+    WorkerPool();
+    virtual ~WorkerPool();
 
-    ~WorkerGroup()
-    {
-        Terminate();
-    }
+    void AddWorker(std::unique_ptr<Worker> worker);
+    void Resolve();
+    void Terminate();
 
-    void AddWorker(function<void()> job)
+    const size_t MaxWorkers() const
     {
-        workers_.push_back(make_shared<Worker>(job));
-    }
-
-    void Notify()
-    {
-        for (auto w = workers_.begin(); w != workers_.end(); ++w)
-        {
-            (*w)->Notify();
-        }
-    }
-
-    void Join()
-    {
-        for (auto w = workers_.begin(); w != workers_.end(); ++w)
-        {
-            (*w)->Join();
-        }
-    }
-
-    void Run()
-    {
-        Notify();
-        Join();
-    }
-
-    void Terminate()
-    {
-        for (auto w = workers_.begin(); w != workers_.end(); ++w)
-        {
-            (*w)->Terminate();
-        }
+        return max_workers_;
     }
 };
